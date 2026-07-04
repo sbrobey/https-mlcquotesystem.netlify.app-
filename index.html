@@ -200,7 +200,7 @@
                 <!-- Notes from Claude (shown when available) -->
                 <div id="est-notes-wrap" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3">
                     <p class="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">Estimator Note</p>
-                    <p id="est-notes" class="text-xs text-amber-900 leading-relaxed"></p>
+                    <textarea id="est-notes" class="text-xs text-amber-900 leading-relaxed w-full bg-transparent border-none outline-none resize-none min-h-[60px]" placeholder="Add your own notes here..."></textarea>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 mt-1">
@@ -626,7 +626,7 @@ CRITICAL RULES:
         if (!activeEstimate) return;
         const c = activeEstimate.costs;
 
-        // Update PDF branding with plumber's own name
+        // PDF branding
         const coName = settings.companyName || 'MLC Solutions (GH) Ltd';
         const coSub = settings.plumberName
             ? settings.plumberName + (settings.phone ? ' · ' + settings.phone : '')
@@ -643,7 +643,7 @@ CRITICAL RULES:
         const notesWrap = document.getElementById('est-notes-wrap');
         const notesEl = document.getElementById('est-notes');
         if (activeEstimate.notes) {
-            notesEl.innerText = activeEstimate.notes;
+            notesEl.value = activeEstimate.notes;
             notesWrap.classList.remove('hidden');
         } else {
             notesWrap.classList.add('hidden');
@@ -693,7 +693,7 @@ CRITICAL RULES:
         const pdfNotesWrap = document.getElementById('pdf-notes-wrap');
         const pdfNotesEl = document.getElementById('pdf-notes');
         if (activeEstimate.notes) {
-            pdfNotesEl.innerText = activeEstimate.notes;
+            pdfNotesEl.innerText = document.getElementById('est-notes').value || activeEstimate.notes;
             pdfNotesWrap.classList.remove('hidden');
         } else {
             pdfNotesWrap.classList.add('hidden');
