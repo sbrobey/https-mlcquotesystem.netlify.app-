@@ -13,11 +13,16 @@ exports.handler = async (event) => {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
+    console.log("ERROR: No API key found");
     return { statusCode: 500, headers, body: JSON.stringify({ error: "API key not set" }) };
   }
 
+  console.log("API key found, length:", apiKey.length);
+
   return new Promise((resolve) => {
     const body = event.body || '{}';
+    console.log("Request body preview:", body.substring(0, 100));
+
     const options = {
       hostname: 'api.anthropic.com',
       path: '/v1/messages',
@@ -34,11 +39,14 @@ exports.handler = async (event) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        console.log("Anthropic status code:", res.statusCode);
+        console.log("Anthropic response:", data.substring(0, 500));
         resolve({ statusCode: res.statusCode, headers, body: data });
       });
     });
 
     req.on('error', (err) => {
+      console.log("HTTPS error:", err.message);
       resolve({ statusCode: 500, headers, body: JSON.stringify({ error: err.message }) });
     });
 
