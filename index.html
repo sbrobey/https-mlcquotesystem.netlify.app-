@@ -203,9 +203,13 @@
                     <textarea id="est-notes" class="text-xs text-amber-900 leading-relaxed w-full bg-transparent border-none outline-none resize-none min-h-[60px]" placeholder="Add your own notes here..."></textarea>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 mt-1">
+                <!-- Share via WhatsApp — full width, prominent -->
+                <button onclick="shareWhatsApp()" class="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm text-sm uppercase tracking-wider">
+                    <i class="fa-brands fa-whatsapp text-lg"></i> Share Estimate via WhatsApp
+                </button>
+                <div class="grid grid-cols-2 gap-2">
                     <button onclick="switchScreen('pdf')" class="bg-ibmBlue-600 hover:bg-ibmBlue-800 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm text-xs uppercase tracking-wider">
-                        <i class="fa-solid fa-file-pdf"></i> Generate PDF
+                        <i class="fa-solid fa-file-pdf"></i> Print PDF
                     </button>
                     <button onclick="switchScreen('home')" class="bg-white border border-slate-200 hover:border-ibmBlue-600 text-slate-700 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm text-xs uppercase tracking-wider">
                         <i class="fa-solid fa-pen-to-square"></i> Edit Job
@@ -308,8 +312,13 @@
                     </div>
                 </div>
 
-                <button onclick="triggerPrint()" class="w-full bg-ibmBlue-600 hover:bg-ibmBlue-800 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2.5 transition-all shadow-md text-xs uppercase tracking-wider no-print">
-                    <i class="fa-solid fa-print"></i> Print / Share PDF
+                <!-- Primary: Share PDF directly to WhatsApp -->
+                <button onclick="sharePDFWhatsApp(event)" class="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2.5 transition-all shadow-md text-sm uppercase tracking-wider no-print">
+                    <i class="fa-brands fa-whatsapp text-lg"></i> Share PDF via WhatsApp
+                </button>
+                <!-- Secondary: Print / save manually -->
+                <button onclick="triggerPrint()" class="w-full bg-white border border-slate-300 hover:border-ibmBlue-600 text-slate-600 font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all text-xs uppercase tracking-wider no-print">
+                    <i class="fa-solid fa-print"></i> Print / Save as PDF
                 </button>
             </section>
 
@@ -732,6 +741,121 @@ CRITICAL RULES:
             localStorage.setItem('mlc_saves', JSON.stringify(saves.slice(0, 20)));
         } catch (e) {}
         alert('✅ Estimate saved to device!');
+    }
+
+
+    function shareWhatsApp() {
+        if (!activeEstimate) return;
+        const c = activeEstimate.costs;
+        const coName = settings.companyName || 'MLC Solutions (GH) Ltd';
+        const byLine = settings.plumberName
+            ? settings.plumberName + (settings.phone ? ' · ' + settings.phone : '')
+            : '';
+        const notes = document.getElementById('est-notes')?.value || activeEstimate.notes || '';
+
+        const boqLines = activeEstimate.boq.map(item =>
+            `  • ${item.name}: ${item.qty} ${item.unit}`
+        ).join('\n');
+
+        const msg =
+`*${coName.toUpperCase()}*` +
+(byLine ? `\n_${byLine}_` : '') +
+`\n\n*PLUMBING ESTIMATE*
+📋 ${activeEstimate.projectType}` +
+(activeEstimate.location ? `\n📍 ${activeEstimate.location}, Accra` : '') +
+`\n⏱ ${activeEstimate.duration} Day(s) · ${activeEstimate.crewText}
+
+*BILL OF QUANTITIES*
+${boqLines}
+
+*COST SUMMARY*
+Materials:    ${fmtGHS(c.materials)}
+Labour:       ${fmtGHS(c.labour)}
+Transport:    ${fmtGHS(c.transport)}
+─────────────────
+Subtotal:     ${fmtGHS(c.subtotal)}
+Markup (${settings.profitPercent}%): ${fmtGHS(c.profit)}
+
+*TOTAL: ${fmtGHS(c.total)}*` +
+(notes ? `\n\n📝 ${notes}` : '') +
+`\n\n⚠️ Valid for 5 days · 60% mobilisation required
+_Prepared using MLC QuickQuote_`;
+
+        if (navigator.share) {
+            navigator.share({ title: 'Plumbing Estimate', text: msg }).catch(() => {});
+        } else {
+            window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+        }
+    }
+
+
+    async function sharePDFWhatsApp(e) {
+        if (!activeEstimate) return;
+
+        const btn = e.currentTarget;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>&nbsp; Generating PDF...';
+        btn.disabled = true;
+
+        try {
+            // Load html2canvas on demand
+            if (!window.html2canvas) {
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                    s.onload = res; s.onerror = rej;
+                    document.head.appendChild(s);
+                });
+            }
+            // Load jsPDF on demand
+            if (!window.jspdf) {
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                    s.onload = res; s.onerror = rej;
+                    document.head.appendChild(s);
+                });
+            }
+
+            const element = document.getElementById('printDocument');
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                logging: false
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = (canvas.height * pageW) / canvas.width;
+            pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH);
+
+            const blob = pdf.output('blob');
+            const estId = document.getElementById('pdf-id').innerText.replace('#', '') || 'QQ';
+            const fileName = `Estimate-${estId}.pdf`;
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: fileName });
+            } else {
+                // Desktop fallback — download the PDF
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        } catch (err) {
+            console.error('PDF share error:', err);
+            window.print(); // Last resort fallback
+        } finally {
+            btn.innerHTML = orig;
+            btn.disabled = false;
+        }
     }
 
     function triggerPrint() { window.print(); }
